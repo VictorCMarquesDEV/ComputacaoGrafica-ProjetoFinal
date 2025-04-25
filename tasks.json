@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compilar OpenGL 64-bit",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-DFREEGLUT_STATIC",             // Define macro para usar versão estática
+                "-o", "main.exe",
+                "main.cpp",
+                "-I", "./include",
+                "-L", "./lib/x64",
+                "-lfreeglut_static",             // Use a versão estática da lib
+                "-lopengl32",
+                "-lglu32"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

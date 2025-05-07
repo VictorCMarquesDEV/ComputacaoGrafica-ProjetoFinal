@@ -153,6 +153,7 @@ void Desenha()
     DesenhaSegmento(Antebraco);
 
     glTranslatef(0.0f, Antebraco.comprimento, 0.0f);
+    glScalef(1.2, 1.2, 0);
     DesenhaGarra(Mao);
     glPopMatrix();
     glPopMatrix();
@@ -220,6 +221,7 @@ void TecladoEspecial(int tecla, int x, int y)
     }
     glutPostRedisplay();
 }
+
 void Mouse(int botao, int estado, int x, int y)
 {
     if (estado == GLUT_DOWN)

@@ -1,1 +1,7 @@
 .exe
+.dll
+.json
+/lib
+/include
+lib
+include

@@ -1,7 +1,7 @@
-.exe
-.dll
-.json
-/lib
-/include
+*.exe
+*.dll
+*.json
+lib/
+include/
 lib
 include

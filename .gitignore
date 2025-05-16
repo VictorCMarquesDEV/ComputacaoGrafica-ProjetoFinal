@@ -1,5 +1,8 @@
+.exe
 *.exe
+.dll
 *.dll
+.json
 *.json
 lib/
 include/

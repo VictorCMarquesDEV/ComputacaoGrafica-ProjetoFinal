@@ -50,7 +50,7 @@ void Desenha()
     glLoadIdentity();
 
     // Configurar a câmera (exemplo)
-    gluLookAt(10.0, 5.0, 15.0, // Posição da câmera
+    gluLookAt(16, 4, 1, // Posição da câmera
               0.0, 0.0, 0.0,   // Para onde a câmera está olhando
               0.0, 1.0, 0.0);  // Vetor "up"
 
@@ -68,37 +68,39 @@ void Desenha()
     glPopMatrix();
 
     // --- Desenhar os Baldes de Lixo ---
-    float espacamentoBaldes = 2.0;
-    float posXInicialBaldes = -4.0; // Posição inicial no eixo X
+    float espacamentoBaldes = 1.0;
+    float posXInicialBaldes = -2.0; // Posição inicial no eixo X
+    float posYBaldes = -0.9;
+    float posZBaldes = 10.0;
 
     // Balde para Metal (Amarelo)
     glPushMatrix();
-    glTranslatef(posXInicialBaldes, -1.0, -8.0);
-    desenharCilindro(1.0, 1.0, 2.0, 32, 32, 1.0, 1.0, 0.0);
+    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 1.0, 1.0, 0.0);
     glPopMatrix();
 
     // Balde para Papel (Azul)
     glPushMatrix();
-    glTranslatef(posXInicialBaldes + espacamentoBaldes, -1.0, -8.0);
-    desenharCilindro(1.0, 1.0, 2.0, 32, 32, 0.0, 0.0, 1.0);
+    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + espacamentoBaldes);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.0, 0.0, 1.0);
     glPopMatrix();
 
     // Balde para Plástico (Vermelho)
     glPushMatrix();
-    glTranslatef(posXInicialBaldes + 2 * espacamentoBaldes, -1.0, -8.0);
-    desenharCilindro(1.0, 1.0, 2.0, 32, 32, 1.0, 0.0, 0.0);
+    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 2 * espacamentoBaldes);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 1.0, 0.0, 0.0);
     glPopMatrix();
 
     // Balde para Vidro (Verde)
     glPushMatrix();
-    glTranslatef(posXInicialBaldes + 3 * espacamentoBaldes, -1.0, -8.0);
-    desenharCilindro(1.0, 1.0, 2.0, 32, 32, 0.0, 1.0, 0.0);
+    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 3 * espacamentoBaldes);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.0, 1.0, 0.0);
     glPopMatrix();
 
     // Balde para Orgânico (Marrom)
     glPushMatrix();
-    glTranslatef(posXInicialBaldes + 4 * espacamentoBaldes, -1.0, -8.0);
-    desenharCilindro(1.0, 1.0, 2.0, 32, 32, 0.5, 0.3, 0.1);
+    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 4 * espacamentoBaldes);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.5, 0.3, 0.1);
     glPopMatrix();
 
     glutSwapBuffers(); // Troca os buffers para exibir o que foi desenhado

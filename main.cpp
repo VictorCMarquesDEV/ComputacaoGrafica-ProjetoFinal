@@ -18,11 +18,18 @@ Mouse:
 LEFT        : Pausar (no jogo)
 RIGHT       : Despausar (no jogo)
 
+Compilar:
+g++ -o main.exe main.cpp lodepng.cpp -I"./include" -L"./lib/x64" -lfreeglut -lopengl32 -lglu32
+
+Executar:
+.\main.exe
+
 */
 
 #include <GL/freeglut.h>
 #include <sstream>
-
+#include <vector>
+#include "lodepng.h"
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState
@@ -44,12 +51,13 @@ const int MAX_NIVEL = 5;
 GLboolean pause = false;
 float velocidadeEsteira = velocidadesNivel[0];
 float offsetEsteira = 0.0f;
+GLuint texturaFundoMenu = 0;
 
 // --- Inicialização do OpenGL ---
 void Inicializa()
 {
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(45.0, 800.0 / 600.0, 0.1, 100.0);
@@ -87,36 +95,86 @@ void desenharTexto(float x, float y, const char *texto, float r, float g, float 
     }
 }
 
-void desenharTextoGrande(float x, float y, const char *texto, float r, float g, float b)
+void carregarTexturaMenu(const char *caminhoDaImagem)
 {
-    glColor3f(r, g, b);
-    glRasterPos2f(x, y);
-    for (const char *c = texto; *c != '\0'; c++)
+    std::vector<unsigned char> image;
+    unsigned int width, height;
+    unsigned int error = lodepng::decode(image, width, height, caminhoDaImagem);
+
+    if (error)
     {
-        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *c);
+        texturaFundoMenu = 0;
+        return;
     }
+
+    glGenTextures(1, &texturaFundoMenu);
+    glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 // --- Funções de Desenho de Telas ---
 void DesenhaMenuInicial()
 {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
     glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
+    glPushMatrix(); // Salva a matriz de projeção atual
     glLoadIdentity();
     gluOrtho2D(0.0, 800.0, 0.0, 600.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    desenharTextoGrande(300, 450, "CLEANING HERO", 1.0, 1.0, 1.0);
+    // --- Desenhar a imagem de fundo ---
+    if (texturaFundoMenu != 0)
+    {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex2f(0.0f, 0.0f); // Canto inferior esquerdo
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex2f(800.0f, 0.0f); // Canto inferior direito
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex2f(800.0f, 600.0f); // Canto superior direito
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex2f(0.0f, 600.0f); // Canto superior esquerdo
+        glEnd();
+
+        glDisable(GL_TEXTURE_2D);
+    }
+    else
+    {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    }
+
+    glEnable(GL_BLEND);                                // Habilita o blending para transparência
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Define a função de blending
+    glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
+    glBegin(GL_QUADS);
+    glVertex2f(340.0f, 270.0f);
+    glVertex2f(350.0f + (12 * 9) + 10.0f, 270.0f);
+    glVertex2f(350.0f + (12 * 9) + 10.0f, 300.0f + 20.0f);
+    glVertex2f(340.0f, 300.0f + 20.0f);
+    glEnd();
+    glDisable(GL_BLEND); // Desabilita o blending
+
     desenharTexto(350, 300, "1 - INICIAR", 1.0, 1.0, 1.0);
-    desenharTexto(350, 250, "2 - SAIR", 1.0, 1.0, 1.0);
+    desenharTexto(350, 280, "2 - SAIR", 1.0, 1.0, 1.0);
 
     glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
+    glPopMatrix(); // Restaura a matriz de projeção 3D
     glMatrixMode(GL_MODELVIEW);
 
     glutSwapBuffers();
@@ -124,6 +182,7 @@ void DesenhaMenuInicial()
 
 void DesenhaTelaFim()
 {
+    glDisable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
@@ -135,14 +194,48 @@ void DesenhaTelaFim()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    desenharTextoGrande(300, 450, "FIM DE JOGO", 1.0, 1.0, 1.0);
+    // --- Desenhar a imagem de fundo ---
+    if (texturaFundoMenu != 0)
+    {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex2f(0.0f, 0.0f); // Canto inferior esquerdo
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex2f(800.0f, 0.0f); // Canto inferior direito
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex2f(800.0f, 600.0f); // Canto superior direito
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex2f(0.0f, 600.0f); // Canto superior esquerdo
+        glEnd();
+
+        glDisable(GL_TEXTURE_2D);
+    }
+    else
+    {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    }
+
+    glEnable(GL_BLEND);                                // Habilita o blending para transparência
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Define a função de blending
+    glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
+    glBegin(GL_QUADS);
+    glVertex2f(290.0f, 220.0f);
+    glVertex2f(530.0f, 220.0f);
+    glVertex2f(530.0f, 328.0f);
+    glVertex2f(290.0f, 328.0f);
+    glEnd();
+    glDisable(GL_BLEND); // Desabilita o blending
 
     std::stringstream ssPontuacaoFinal;
     ssPontuacaoFinal << "PONTUACAO FINAL: " << pontuacao;
-    desenharTextoGrande(250, 350, ssPontuacaoFinal.str().c_str(), 0.0, 1.0, 0.0); // Verde
+    desenharTexto(300, 300, ssPontuacaoFinal.str().c_str(), 0.0, 1.0, 0.0);
 
-    desenharTexto(300, 300, "1 - VOLTAR AO INICIO", 1.0, 1.0, 1.0);
-    desenharTexto(300, 250, "2 - SAIR", 1.0, 1.0, 1.0);
+    desenharTexto(300, 250, "1 - VOLTAR AO INICIO", 1.0, 1.0, 1.0);
+    desenharTexto(300, 230, "2 - SAIR", 1.0, 1.0, 1.0);
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
@@ -153,6 +246,7 @@ void DesenhaTelaFim()
 
 void DesenhaJogo()
 {
+    glEnable(GL_DEPTH_TEST);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
@@ -238,7 +332,7 @@ void DesenhaJogo()
     // Exibir status de pausa
     if (pause)
     {
-        desenharTextoGrande(350, 300, "PAUSADO", 1.0, 0.0, 0.0);
+        desenharTexto(350, 300, "PAUSADO", 1.0, 0.0, 0.0);
     }
 
     glMatrixMode(GL_PROJECTION);
@@ -392,6 +486,7 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutCreateWindow("Projeto Final - Cleaning Hero");
+    carregarTexturaMenu("background.png");
     glutDisplayFunc(Desenha);
 
     glutKeyboardFunc(Teclado);

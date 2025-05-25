@@ -3,35 +3,67 @@
 Componentes: João Vitor de Carvalho, José Henrique Castro e Victor Cavalcanti
 
 Teclado:
-1           : Escolhe
-2           : Escolhe
-3           : Escolhe
-4           : Escolhe
-5           : Escolhe
+1          : Escolha (No jogo: Lixo tipo 1, No menu/game over: Escolhe opção)
+2          : Escolha (No jogo: Lixo tipo 2, No menu/game over: Escolhe opção)
+3          : Escolha (No jogo: Lixo tipo 3, No menu/game over: Escolhe opção)
+4          : Escolha (No jogo: Lixo tipo 4, No menu/game over: Escolhe opção)
+5          : Escolha (No jogo: Lixo tipo 5, No menu/game over: Escolhe opção)
 
 Teclado Especial:
-HOME        : Abre menu
-PAGE UP     : Aumenta velocidade da esteira
-PAGE DOWN   : Diminui velocidade da esteira
+HOME        : Encerra partida (no jogo)
+PAGE UP     : Aumenta velocidade da esteira (no jogo)
+PAGE DOWN   : Diminui velocidade da esteira (no jogo)
 
 Mouse:
-LEFT        : Pausar
-RIGHT       : Pronto
+LEFT        : Pausar (no jogo)
+RIGHT       : Despausar (no jogo)
 
 */
 
 #include <GL/freeglut.h>
+#include <sstream>
 
-// Variáveis
+
+// --- Variáveis de Estado do Jogo ---
+enum GameState
+{
+    MENU_INICIAL,
+    JOGO,
+    GAME_OVER
+};
+
+// Variáveis do Jogo
+GameState estadoAtual = MENU_INICIAL;
+int pontuacao = 0;
+int nivel = 1;
+int vida = 5;
+const int PONTOS_POR_NIVEL = 100;
+const int PONTOS_POR_ACERTO = 10;
+float velocidadesNivel[] = {0.002f, 0.004f, 0.006f, 0.008f, 0.01f};
+const int MAX_NIVEL = 5;
 GLboolean pause = false;
+float velocidadeEsteira = velocidadesNivel[0];
+float offsetEsteira = 0.0f;
 
-// Funções para desenhar formas básicas
+// --- Inicialização do OpenGL ---
+void Inicializa()
+{
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0, 800.0 / 600.0, 0.1, 100.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+// --- Funções para Desenhar Formas Básicas ---
 void desenharCubo(float tamanhoX, float tamanhoY, float tamanhoZ, float r, float g, float b)
 {
     glColor3f(r, g, b);
     glPushMatrix();
     glScalef(tamanhoX, tamanhoY, tamanhoZ);
-    glutSolidCube(1.0); // Ou uma função similar para desenhar um cubo
+    glutSolidCube(1.0);
     glPopMatrix();
 }
 
@@ -39,37 +71,111 @@ void desenharCilindro(float raioBase, float raioTop, float altura, int fatias, i
 {
     glColor3f(r, g, b);
     glPushMatrix();
-    glRotatef(-90.0, 1.0, 0.0, 0.0);                     // Alinha o cilindro verticalmente
-    glutSolidCylinder(raioBase, altura, fatias, pilhas); // Ou uma função similar
+    glRotatef(-90.0, 1.0, 0.0, 0.0);
+    glutSolidCylinder(raioBase, altura, fatias, pilhas);
     glPopMatrix();
 }
 
-void Desenha()
+// --- Funções para Desenhar Texto ---
+void desenharTexto(float x, float y, const char *texto, float r, float g, float b)
 {
+    glColor3f(r, g, b);
+    glRasterPos2f(x, y);
+    for (const char *c = texto; *c != '\0'; c++)
+    {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+}
+
+void desenharTextoGrande(float x, float y, const char *texto, float r, float g, float b)
+{
+    glColor3f(r, g, b);
+    glRasterPos2f(x, y);
+    for (const char *c = texto; *c != '\0'; c++)
+    {
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *c);
+    }
+}
+
+// --- Funções de Desenho de Telas ---
+void DesenhaMenuInicial()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    // Configurar a câmera (exemplo)
-    gluLookAt(16, 4, 1, // Posição da câmera
-              0.0, 0.0, 0.0,   // Para onde a câmera está olhando
-              0.0, 1.0, 0.0);  // Vetor "up"
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, 800.0, 0.0, 600.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    desenharTextoGrande(300, 450, "CLEANING HERO", 1.0, 1.0, 1.0);
+    desenharTexto(350, 300, "1 - INICIAR", 1.0, 1.0, 1.0);
+    desenharTexto(350, 250, "2 - SAIR", 1.0, 1.0, 1.0);
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    glutSwapBuffers();
+}
+
+void DesenhaTelaFim()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, 800.0, 0.0, 600.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    desenharTextoGrande(300, 450, "FIM DE JOGO", 1.0, 1.0, 1.0);
+
+    std::stringstream ssPontuacaoFinal;
+    ssPontuacaoFinal << "PONTUACAO FINAL: " << pontuacao;
+    desenharTextoGrande(250, 350, ssPontuacaoFinal.str().c_str(), 0.0, 1.0, 0.0); // Verde
+
+    desenharTexto(300, 300, "1 - VOLTAR AO INICIO", 1.0, 1.0, 1.0);
+    desenharTexto(300, 250, "2 - SAIR", 1.0, 1.0, 1.0);
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    glutSwapBuffers();
+}
+
+void DesenhaJogo()
+{
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+
+    gluLookAt(16, 4, 1,
+              0.0, 0.0, 0.0,
+              0.0, 1.0, 0.0);
 
     // --- Desenhar a Esteira Rolante ---
-    // Base da esteira
     glPushMatrix();
-    glTranslatef(0.0, -0.5, 0.0);                // Posição
-    desenharCubo(20.0, 1.0, 5.0, 0.5, 0.5, 0.5); // Cinza escuro
+    glTranslatef(0.0, -0.5, 0.0);
+    desenharCubo(20.0, 1.0, 5.0, 0.5, 0.5, 0.5);
     glPopMatrix();
 
-    // Superfície móvel da esteira (poderia ter textura e animação aqui)
     glPushMatrix();
-    glTranslatef(0.0, 0.0, 0.0);                 // Posição
-    desenharCubo(19.0, 0.2, 4.0, 0.3, 0.3, 0.3); // Cinza mais claro
+    glTranslatef(0.0, 0.0, 0.0);
+    glTranslated(offsetEsteira, 0.0, 0.0);
+    desenharCubo(19.0, 0.2, 4.0, 0.3, 0.3, 0.3);
     glPopMatrix();
 
     // --- Desenhar os Baldes de Lixo ---
     float espacamentoBaldes = 1.0;
-    float posXInicialBaldes = -2.0; // Posição inicial no eixo X
+    float posXInicialBaldes = -2.0;
     float posYBaldes = -0.9;
     float posZBaldes = 10.0;
 
@@ -100,74 +206,186 @@ void Desenha()
     // Balde para Orgânico (Marrom)
     glPushMatrix();
     glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 4 * espacamentoBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.5, 0.3, 0.1);
+    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.54, 0.27, 0.07);
     glPopMatrix();
 
-    glutSwapBuffers(); // Troca os buffers para exibir o que foi desenhado
-}
+    // --- Desenhar Lixo (Exemplo de um cubo para lixo) ---
+    glPushMatrix();
+    glTranslatef(5.0 - offsetEsteira * 20, 0.5, 0.0);
+    desenharCubo(0.5, 0.5, 0.5, 0.6, 0.4, 0.2);
+    glPopMatrix();
 
-void Teclado(unsigned char key, int x, int y)
-{
-    switch (key)
+    // --- Exibir Pontuação e Nível ---
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, 800.0, 0.0, 600.0); // Projeção 2D para texto HUD
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    std::stringstream ssPontuacao;
+    ssPontuacao << "PONTOS: " << pontuacao;
+    desenharTexto(10, 580, ssPontuacao.str().c_str(), 0.0, 1.0, 0.0); // Verde
+
+    std::stringstream ssNivel;
+    ssNivel << "NIVEL: " << nivel;
+    desenharTexto(10, 560, ssNivel.str().c_str(), 0.0, 0.0, 1.0); // Azul
+
+    std::stringstream ssVida;
+    ssVida << "VIDAS: " << vida;
+    desenharTexto(10, 540, ssVida.str().c_str(), 1.0, 0.0, 0.0); // Vermelho
+
+    // Exibir status de pausa
+    if (pause)
     {
-    case 49:
-        // Escolhe - 1
-        break;
-    case 50:
-        // Escolhe - 2
-        break;
-    case 51:
-        // Escolhe - 3
-        break;
-    case 52:
-        // Escolhe - 4
-        break;
-    case 53:
-        // Escolhe - 5
-        break;
+        desenharTextoGrande(350, 300, "PAUSADO", 1.0, 0.0, 0.0);
     }
 
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    glutSwapBuffers();
+}
+
+// --- Função de Display Principal (Gerencia os estados) ---
+void Desenha()
+{
+    switch (estadoAtual)
+    {
+    case MENU_INICIAL:
+        DesenhaMenuInicial();
+        break;
+    case JOGO:
+        DesenhaJogo();
+        break;
+    case GAME_OVER:
+        DesenhaTelaFim();
+        break;
+    }
+}
+
+// --- Função de Animação (Idle) ---
+void Anima(int valor)
+{
+    if (estadoAtual == JOGO && !pause)
+    {
+        offsetEsteira += velocidadeEsteira;
+        if (offsetEsteira > 1.0f)
+        { // Reinicia o offset para simular movimento contínuo
+            offsetEsteira -= 1.0f;
+            // AQUI: Lógica de Lixo
+        }
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(1000 / 120, Anima, 0);
+}
+
+// --- Manipulação de Teclado/Mouse ---
+void Teclado(unsigned char key, int x, int y)
+{
+    switch (estadoAtual)
+    {
+    case MENU_INICIAL:
+        if (key == '1')
+        {
+            estadoAtual = JOGO;
+            pontuacao = 0;                           // Zera a pontuação
+            nivel = 1;                               // Volta para o nível 1
+            vida = 5;                                // Reseta as vidas
+            velocidadeEsteira = velocidadesNivel[0]; // Reseta a velocidade para o nível 1
+            Inicializa();
+        }
+        else if (key == '2')
+        {
+            exit(0);
+        }
+        break;
+    case JOGO:
+        switch (key)
+        {
+        case '1': // Lixo tipo 1
+
+            pontuacao += PONTOS_POR_ACERTO;
+            if (nivel < MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL)
+            {
+                nivel++;
+                velocidadeEsteira = velocidadesNivel[nivel - 1];
+            }
+            if (nivel == MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL)
+            {
+                estadoAtual = GAME_OVER;
+                Inicializa();
+            }
+            break;
+
+        case '2': // Lixo tipo 2
+            break;
+        case '3': // Lixo tipo 3
+            break;
+        case '4': // Lixo tipo 4
+            break;
+        case '5': // Lixo tipo 5
+            vida -= 1;
+            if (vida < 0)
+            {
+                estadoAtual = GAME_OVER;
+                Inicializa();
+            }
+            break;
+        }
+        break;
+    case GAME_OVER:
+        if (key == '1')
+        {
+            estadoAtual = MENU_INICIAL;
+            Inicializa();
+        }
+        else if (key == '2')
+            exit(0); // Sai do jogo
+        break;
+    }
     glutPostRedisplay();
 }
 
 void TecladoEspecial(int tecla, int x, int y)
 {
-    switch (tecla)
+    if (estadoAtual == JOGO)
     {
-    case GLUT_KEY_HOME:
-        // Abre menu
-        break;
-    case GLUT_KEY_PAGE_UP:
-        // Aumenta velocidade da esteira
-        break;
-    case GLUT_KEY_PAGE_DOWN:
-        // Diminui velocidade da esteira
-        break;
+        switch (tecla)
+        {
+        case GLUT_KEY_PAGE_UP:
+            velocidadeEsteira += 0.01f; // Aumenta velocidade
+            if (velocidadeEsteira > 0.5f)
+                velocidadeEsteira = 0.5f;
+            break;
+        case GLUT_KEY_PAGE_DOWN:
+            velocidadeEsteira -= 0.01f; // Diminui velocidade
+            if (velocidadeEsteira < 0.01f)
+                velocidadeEsteira = 0.01f;
+            break;
+        case GLUT_KEY_HOME:
+            estadoAtual = GAME_OVER;
+            break;
+        }
     }
-
     glutPostRedisplay();
 }
 
-// Pausar o jogo
 void Mouse(int botao, int estado, int x, int y)
 {
-    if (botao == GLUT_LEFT_BUTTON && pause == false)
-        !pause;
-    if (botao == GLUT_RIGHT_BUTTON && pause == true)
-        !pause;
+    if (estadoAtual == JOGO)
+    {
+        if (botao == GLUT_LEFT_BUTTON && estado == GLUT_DOWN && pause == false)
+            pause = !pause;
+        if (botao == GLUT_RIGHT_BUTTON && estado == GLUT_DOWN && pause == true)
+            pause = !pause;
+    }
     glutPostRedisplay();
 }
 
-void Inicializa()
-{
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glEnable(GL_DEPTH_TEST); // Habilita o teste de profundidade para objetos 3D
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(45.0, 800.0 / 600.0, 0.1, 100.0); // Perspectiva
-    glMatrixMode(GL_MODELVIEW);
-}
-
+// --- Função Principal ---
 int main(int argc, char **argv)
 {
     glutInit(&argc, argv);
@@ -180,7 +398,7 @@ int main(int argc, char **argv)
     glutSpecialFunc(TecladoEspecial);
     glutMouseFunc(Mouse);
 
-    Inicializa();
+    glutTimerFunc(0, Anima, 0);
     glutMainLoop();
     return 0;
 }

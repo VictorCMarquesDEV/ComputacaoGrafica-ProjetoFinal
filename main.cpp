@@ -434,7 +434,7 @@ void Teclado(unsigned char key, int x, int y)
             break;
         case '5': // Lixo tipo 5
             vida -= 1;
-            if (vida < 0)
+            if (vida < 1)
             {
                 estadoAtual = GAME_OVER;
                 Inicializa();

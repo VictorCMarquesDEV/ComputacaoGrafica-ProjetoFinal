@@ -30,8 +30,6 @@ Executar:
 #include <sstream>
 #include <vector>
 #include "lodepng.h"
-#include <windows.h>
-#include <mmsystem.h>
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState

@@ -19,7 +19,7 @@ LEFT        : Pausar (no jogo)
 RIGHT       : Despausar (no jogo)
 
 Compilar:
-g++ -o main.exe main.cpp lodepng.cpp -I"./include" -L"./lib/x64" -lfreeglut -lopengl32 -lglu32
+g++ -o main.exe main.cpp lodepng.cpp -I"./include" -L"./lib/x64" -lfreeglut -lopengl32 -lglu32 -lwinmm
 
 Executar:
 .\main.exe
@@ -30,6 +30,8 @@ Executar:
 #include <sstream>
 #include <vector>
 #include "lodepng.h"
+#include <windows.h>
+#include <mmsystem.h>
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState
@@ -52,6 +54,14 @@ GLboolean pause = false;
 float velocidadeEsteira = velocidadesNivel[0];
 float offsetEsteira = 0.0f;
 GLuint texturaFundoMenu = 0;
+
+/*
+const char *MUSICA_JOGO = "./resources/sound_game.wav";
+const char *SOM_CORRETO = "./resources/sound_correct.wav";
+const char *SOM_ERRADO = "./resources/sound_incorrect.wav";
+const char *SOM_GANHOU = "./resources/sound_win_game.wav";
+const char *SOM_PERDEU = "./resources/sound_fail_game.wav";
+*/
 
 // --- Inicialização do OpenGL ---
 void Inicializa()
@@ -95,6 +105,7 @@ void desenharTexto(float x, float y, const char *texto, float r, float g, float 
     }
 }
 
+// --- Funções para Carregar Mídia ---
 void carregarTexturaMenu(const char *caminhoDaImagem)
 {
     std::vector<unsigned char> image;
@@ -393,6 +404,7 @@ void Teclado(unsigned char key, int x, int y)
         }
         else if (key == '2')
         {
+            PlaySound(NULL, NULL, 0);
             exit(0);
         }
         break;
@@ -437,7 +449,10 @@ void Teclado(unsigned char key, int x, int y)
             Inicializa();
         }
         else if (key == '2')
-            exit(0); // Sai do jogo
+        {
+            PlaySound(NULL, NULL, 0);
+            exit(0);
+        }
         break;
     }
     glutPostRedisplay();
@@ -486,7 +501,7 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutCreateWindow("Projeto Final - Cleaning Hero");
-    carregarTexturaMenu("background.png");
+    carregarTexturaMenu("./resources/background.png");
     glutDisplayFunc(Desenha);
 
     glutKeyboardFunc(Teclado);

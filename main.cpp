@@ -30,6 +30,8 @@ Executar:
 #include <sstream>
 #include <vector>
 #include "lodepng.h"
+#include <algorithm>
+#include <random>
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState
@@ -52,6 +54,28 @@ GLboolean pause = false;
 float velocidadeEsteira = velocidadesNivel[0];
 float offsetEsteira = 0.0f;
 GLuint texturaFundoMenu = 0;
+int lixoSpawnCounter = 0;
+
+// ---- CONSTANTES DO JOGO ----
+const float LIXO_START_X = -10.0f;                 // Posição X inicial do lixo
+const float POSICAO_FINAL_ESTEIRA = 11.0f;       // Posição X onde o lixo é considerado perdido (um pouco depois dos baldes)
+const float ZONA_COLETA_INICIO = 7.5f;           // Início da zona onde o jogador pode coletar o lixo
+const float ZONA_COLETA_FIM = 11.5f;             // Fim da zona de coleta (próximo aos baldes)
+const float TRILHA_Z_POSITIONS[] = {-2.0f, -1.0f, 0.0f, 1.0f, 2.0f}; // Posições Z das 5 trilhas de lixo
+
+enum TipoLixo { METAL, PAPEL, PLASTICO, VIDRO, ORGANICO, NUM_TIPOS_LIXO };
+
+struct LixoItem {
+    float posX;         // Posição X na esteira (para onde ele se move)
+    float posZ;         // Posição Z (em qual "trilha" da esteira ele está)
+    TipoLixo tipo;
+    bool ativo;         // Se ainda está em jogo, não coletado/errado
+    float tamanho;      // Para variar visualmente
+    float cor[3];       // Cor específica do lixo(atualmente não utilizado)
+    // Dá para criar um ID se caso formos usar textura para os lixos
+};
+
+std::vector<LixoItem> lixosNaEsteira;
 
 /*
 const char *MUSICA_JOGO = "./resources/sound_game.wav";
@@ -90,6 +114,52 @@ void desenharCilindro(float raioBase, float raioTop, float altura, int fatias, i
     glRotatef(-90.0, 1.0, 0.0, 0.0);
     glutSolidCylinder(raioBase, altura, fatias, pilhas);
     glPopMatrix();
+}
+
+void desenharFormaLixo(const LixoItem& lixo) {
+    float r=0.5f, g=0.5f, b=0.5f; // Cor padrão cinza
+    switch (lixo.tipo) {
+        case METAL:    r=1.0f; g=1.0f; b=0.0f; break; // Amarelo
+        case PAPEL:    r=0.0f; g=0.0f; b=1.0f; break; // Azul
+        case PLASTICO: r=1.0f; g=0.0f; b=0.0f; break; // Vermelho
+        case VIDRO:    r=0.0f; g=1.0f; b=0.0f; break; // Verde
+        case ORGANICO: r=0.54f; g=0.27f; b=0.07f; break; // Marrom
+    }
+    desenharCubo(0.4f, 0.4f, 0.4f, r, g, b);
+}
+
+void GerarNovoLixo() {
+    if (lixosNaEsteira.size() > 15) return; // Limite para não sobrecarregar
+
+    LixoItem novoLixo;
+    novoLixo.tipo = static_cast<TipoLixo>(rand() % NUM_TIPOS_LIXO);
+
+    switch (novoLixo.tipo) {
+        case METAL:
+            novoLixo.posZ = TRILHA_Z_POSITIONS[0]; // Trilha do Metal (-2.0f)
+            break;
+        case PAPEL:
+            novoLixo.posZ = TRILHA_Z_POSITIONS[1]; // Trilha do Papel (-1.0f)
+            break;
+        case PLASTICO:
+            novoLixo.posZ = TRILHA_Z_POSITIONS[2]; // Trilha do Plástico (0.0f)
+            break;
+        case VIDRO:
+            novoLixo.posZ = TRILHA_Z_POSITIONS[3]; // Trilha do Vidro (1.0f)
+            break;
+        case ORGANICO:
+            novoLixo.posZ = TRILHA_Z_POSITIONS[4]; // Trilha do Orgânico (2.0f)
+            break;
+        default: // Em teoria, não deve ser alcançado devido ao rand() % NUM_TIPOS_LIXO
+            novoLixo.posZ = TRILHA_Z_POSITIONS[0];
+            break;
+    }
+
+    novoLixo.posX = LIXO_START_X; // Posição X inicial do lixo
+    novoLixo.ativo = true;
+    novoLixo.tamanho = 0.4f;
+
+    lixosNaEsteira.push_back(novoLixo);
 }
 
 // --- Funções para Desenhar Texto ---
@@ -313,10 +383,20 @@ void DesenhaJogo()
     glPopMatrix();
 
     // --- Desenhar Lixo (Exemplo de um cubo para lixo) ---
+    for (const auto& lixo : lixosNaEsteira) {
+        if (lixo.ativo) {
+            glPushMatrix();
+            glTranslatef(lixo.posX, 0.5f, lixo.posZ); // 0.5f é a altura na esteira
+            desenharFormaLixo(lixo); // Nova função
+            glPopMatrix();
+        }
+    }
+    /*
     glPushMatrix();
     glTranslatef(5.0 - offsetEsteira * 20, 0.5, 0.0);
     desenharCubo(0.5, 0.5, 0.5, 0.6, 0.4, 0.2);
     glPopMatrix();
+    */
 
     // --- Exibir Pontuação e Nível ---
     glMatrixMode(GL_PROJECTION);
@@ -371,16 +451,48 @@ void Desenha()
 // --- Função de Animação (Idle) ---
 void Anima(int valor)
 {
-    if (estadoAtual == JOGO && !pause)
-    {
-        offsetEsteira += velocidadeEsteira;
-        if (offsetEsteira > 1.0f)
-        { // Reinicia o offset para simular movimento contínuo
+    if (estadoAtual == JOGO && !pause) {
+        offsetEsteira += velocidadeEsteira; // Para a textura da esteira
+        if (offsetEsteira > 1.0f) {
             offsetEsteira -= 1.0f;
-            // AQUI: Lógica de Lixo
+        }
+
+        // Movimentar lixos
+        for (auto& lixo : lixosNaEsteira) {
+            if (lixo.ativo) {
+                lixo.posX += velocidadeEsteira * 20; // O multiplicador para a velocidade desejada do lixo
+            }
+        }
+
+        // Remover lixos inativos (coletados ou perdidos) para otimizar
+        lixosNaEsteira.erase(std::remove_if(lixosNaEsteira.begin(), lixosNaEsteira.end(),
+                                        [](const LixoItem& l) { return !l.ativo; }),
+                            lixosNaEsteira.end());
+
+        // Lógica de gerar novo lixo
+        lixoSpawnCounter++;
+        int intervaloSpawn = 120 - (nivel * 15);
+        if (intervaloSpawn < 30) intervaloSpawn = 30; // Mínimo intervalo para não ficar impossível
+
+        if (lixoSpawnCounter > intervaloSpawn) {
+            GerarNovoLixo();
+            lixoSpawnCounter = 0;
+        }
+
+        // Lógica de lixo perdido (passou do fim da esteira)
+        for (auto& lixo : lixosNaEsteira) {
+            if (lixo.ativo && lixo.posX > POSICAO_FINAL_ESTEIRA) { // POSICAO_FINAL_ESTEIRA um pouco depois dos baldes
+                vida--;
+                lixo.ativo = false;
+                // PlaySound(SOM_ERRADO, NULL, SND_ASYNC);
+                if (vida < 1) {
+                    estadoAtual = GAME_OVER;
+                    // PlaySound(SOM_PERDEU, NULL, SND_ASYNC);
+                    Inicializa(); // Ou uma função SetupGameOver()
+                }
+            }
         }
     }
-
     glutPostRedisplay();
     glutTimerFunc(1000 / 120, Anima, 0);
 }
@@ -388,6 +500,8 @@ void Anima(int valor)
 // --- Manipulação de Teclado/Mouse ---
 void Teclado(unsigned char key, int x, int y)
 {
+    bool acertoRealizado = false;
+    TipoLixo tipoSelecionado;
     switch (estadoAtual)
     {
     case MENU_INICIAL:
@@ -396,50 +510,86 @@ void Teclado(unsigned char key, int x, int y)
             estadoAtual = JOGO;
             pontuacao = 0;                           // Zera a pontuação
             nivel = 1;                               // Volta para o nível 1
-            vida = 5;                                // Reseta as vidas
+            vida = 100000;                           // Reseta as vidas
             velocidadeEsteira = velocidadesNivel[0]; // Reseta a velocidade para o nível 1
             Inicializa();
         }
         else if (key == '2')
         {
-            PlaySound(NULL, NULL, 0);
+            //PlaySound(NULL, NULL, 0);
             exit(0);
         }
         break;
     case JOGO:
-        switch (key)
-        {
-        case '1': // Lixo tipo 1
 
-            pontuacao += PONTOS_POR_ACERTO;
-            if (nivel < MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL)
-            {
-                nivel++;
-                velocidadeEsteira = velocidadesNivel[nivel - 1];
+        if (key >= '1' && key <= '5') { 
+            switch (key) {
+                case '1': tipoSelecionado = ORGANICO; break;
+                case '2': tipoSelecionado = VIDRO;    break;
+                case '3': tipoSelecionado = PLASTICO; break;
+                case '4': tipoSelecionado = PAPEL;    break;
+                case '5': tipoSelecionado = METAL;    break;
+                default:
+                    return;
             }
-            if (nivel == MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL)
-            {
-                estadoAtual = GAME_OVER;
-                Inicializa();
+            for (auto& lixo : lixosNaEsteira) {
+                if (lixo.ativo && lixo.posX >= ZONA_COLETA_INICIO && lixo.posX <= ZONA_COLETA_FIM) {
+                    if (lixo.tipo == tipoSelecionado) {
+                        // ACERTO!
+                        pontuacao += PONTOS_POR_ACERTO;
+                        lixo.ativo = false; // Lixo coletado
+                        acertoRealizado = true;
+                        if (nivel < MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL) {
+                            nivel++;
+                            if (nivel <= MAX_NIVEL) { // Garante que não acesse fora do array
+                                velocidadeEsteira = velocidadesNivel[nivel - 1];
+                            }
+                            // Poderia adicionar um som de "level up"
+                        }
+                        // Condição de vitória 
+                        if (nivel == MAX_NIVEL && pontuacao >= (nivel * PONTOS_POR_NIVEL + PONTOS_POR_NIVEL)) { // Ex: precisa de mais 100 pts no nível max
+                            // estadoAtual = GAME_OVER; // Podemos criar um estado de Vitória no lugar de GAME_OVER nesse caso
+                            // PlaySound(SOM_GANHOU, NULL, SND_ASYNC);
+                            // Inicializa();
+                        }
+                        // ----- FIM DA LÓGICA DE NÍVEL E VITÓRIA -----
+                        // PlaySound(SOM_CORRETO, NULL, SND_ASYNC); // Adicionar som
+                        // TODO: Animação de coleta, partículas, etc.
+                        break;
+                    }
+                }
             }
-            break;
+        if (!acertoRealizado && (key >= '1' && key <= '5')) {
+            bool lixoNaZona = false;
+            bool tipoErradoPressionadoParaLixoPresente = false;
 
-        case '2': // Lixo tipo 2
-            break;
-        case '3': // Lixo tipo 3
-            break;
-        case '4': // Lixo tipo 4
-            break;
-        case '5': // Lixo tipo 5
-            vida -= 1;
-            if (vida < 1)
-            {
-                estadoAtual = GAME_OVER;
-                Inicializa();
+            for (auto& lixo : lixosNaEsteira) {
+                if (lixo.ativo && lixo.posX >= ZONA_COLETA_INICIO && lixo.posX <= ZONA_COLETA_FIM) {
+                    lixoNaZona = true;
+                    if (lixo.tipo != tipoSelecionado) {
+                        tipoErradoPressionadoParaLixoPresente = true;
+                    }
+                    break;
+                }
             }
-            break;
+
+            if (tipoErradoPressionadoParaLixoPresente) { // Apertou tecla errada para um lixo na zona
+                vida--;
+                // PlaySound(SOM_ERRADO, NULL, SND_ASYNC);
+            } else if (lixoNaZona) {
+                // Apertou a tecla certa, mas já foi processado como acerto. Não deveria chegar aqui se acertoRealizado=true
+            } else { // Apertou uma tecla de coleta, mas não havia nenhum lixo na zona
+                // vida--; // Penalidade por apertar "em falso".(A decidir)
+                // PlaySound(SOM_ERRADO, NULL, SND_ASYNC);
+            }
+        }
+        if (vida < 1 && estadoAtual == JOGO) { // Verifica se o estado ainda é JOGO para evitar múltiplas transições
+            estadoAtual = GAME_OVER;
+            // PlaySound(SOM_PERDEU, NULL, SND_ASYNC);
+            Inicializa();
         }
         break;
+
     case GAME_OVER:
         if (key == '1')
         {
@@ -448,12 +598,13 @@ void Teclado(unsigned char key, int x, int y)
         }
         else if (key == '2')
         {
-            PlaySound(NULL, NULL, 0);
+            //PlaySound(NULL, NULL, 0);
             exit(0);
         }
         break;
-    }
+        }
     glutPostRedisplay();
+    }
 }
 
 void TecladoEspecial(int tecla, int x, int y)
@@ -495,6 +646,7 @@ void Mouse(int botao, int estado, int x, int y)
 // --- Função Principal ---
 int main(int argc, char **argv)
 {
+    srand(time(NULL));
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);

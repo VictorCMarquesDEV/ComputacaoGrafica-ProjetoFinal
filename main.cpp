@@ -534,6 +534,27 @@ void Anima(int valor)
     glutTimerFunc(1000 / 120, Anima, 0);
 }
 
+void ResetarJogo()
+{
+    // Reseta as estatísticas do jogador
+    pontuacao = 0;
+    nivel = 1;
+    vida = 10;
+
+    // Reseta as variáveis de controle do jogo
+    velocidadeEsteira = velocidadesNivel[0];
+    offsetEsteira = 0.0f;
+    lixoSpawnCounter = 0;
+    pause = false;
+
+    // Limpa a os lixos na lixeira
+    lixosNaEsteira.clear();
+
+    // Para a música de fundo e a reinicia, garantindo um começo limpo
+    PlaySound(NULL, NULL, 0);
+    PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
+}
+
 // --- Manipulação de Teclado/Mouse ---
 void Teclado(unsigned char key, int x, int y)
 {
@@ -545,15 +566,12 @@ void Teclado(unsigned char key, int x, int y)
         if (key == '1')
         {
             estadoAtual = JOGO;
-            pontuacao = 0;                           // Zera a pontuação
-            nivel = 1;                               // Volta para o nível 1
-            vida = 100000;                           // Reseta as vidas
-            velocidadeEsteira = velocidadesNivel[0]; // Reseta a velocidade para o nível 1
+            ResetarJogo();
             Inicializa();
         }
         else if (key == '2')
         {
-            // PlaySound(NULL, NULL, 0);
+            PlaySound(NULL, NULL, 0);
             exit(0);
         }
         break;
@@ -654,6 +672,7 @@ void Teclado(unsigned char key, int x, int y)
             }
             else if (key == '2')
             {
+                PlaySound(NULL, NULL, 0);
                 exit(0);
             }
             break;

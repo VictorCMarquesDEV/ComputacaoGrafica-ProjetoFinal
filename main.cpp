@@ -484,11 +484,6 @@ void Anima(int valor)
 {
     if (estadoAtual == JOGO && !pause)
     {
-        offsetEsteira += velocidadeEsteira; // Para a textura da esteira
-        if (offsetEsteira > 1.0f)
-        {
-            offsetEsteira -= 1.0f;
-        }
 
         // Movimentar lixos
         for (auto &lixo : lixosNaEsteira)
@@ -524,11 +519,9 @@ void Anima(int valor)
             { // POSICAO_FINAL_ESTEIRA um pouco depois dos baldes
                 vida--;
                 lixo.ativo = false;
-                // PlaySound(SOM_ERRADO, NULL, SND_ASYNC);
                 if (vida < 1)
                 {
                     estadoAtual = GAME_OVER;
-                    // PlaySound(SOM_PERDEU, NULL, SND_ASYNC);
                     Inicializa(); // Ou uma função SetupGameOver()
                 }
             }
@@ -543,11 +536,10 @@ void ResetarJogo()
     // Reseta as estatísticas do jogador
     pontuacao = 0;
     nivel = 1;
-    vida = 10;
+    vida = 5;
 
     // Reseta as variáveis de controle do jogo
     velocidadeEsteira = velocidadesNivel[0];
-    offsetEsteira = 0.0f;
     lixoSpawnCounter = 0;
     pause = false;
 

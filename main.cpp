@@ -38,6 +38,7 @@ Executar:
 #include <windows.h>
 #include <mmsystem.h>
 #include <ctime>
+#include <map>
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState
@@ -59,8 +60,7 @@ const int MAX_NIVEL = 5;
 const int MAX_PONTUACAO = 500;
 GLboolean pause = false;
 float velocidadeEsteira = velocidadesNivel[0];
-float offsetEsteira = 0.0f;
-GLuint texturaFundoMenu = 0;
+std::map<std::string, GLuint> texturasDoJogo;
 int lixoSpawnCounter = 0;
 
 // ---- CONSTANTES DA MÚSICA ----
@@ -209,7 +209,7 @@ void desenharTexto(float x, float y, const char *texto, float r, float g, float 
 }
 
 // --- Funções para Carregar Mídia ---
-void carregarTexturaMenu(const char *caminhoDaImagem)
+void carregarTextura(const std::string &nome, const std::string &caminhoDaImagem)
 {
     std::vector<unsigned char> image;
     unsigned int width, height;
@@ -217,21 +217,26 @@ void carregarTexturaMenu(const char *caminhoDaImagem)
 
     if (error)
     {
-        texturaFundoMenu = 0;
+        texturasDoJogo[nome] = 0; // Store 0 to indicate failure
         return;
     }
 
-    glGenTextures(1, &texturaFundoMenu);
-    glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // Changed to GL_REPEAT for things like conveyor
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // Changed to GL_REPEAT
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    // Upload texture data
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+
+    texturasDoJogo[nome] = textureID; // Store the loaded texture ID
 }
 
 // --- Funções de Desenho de Telas ---
@@ -249,10 +254,10 @@ void DesenhaMenuInicial()
     glLoadIdentity();
 
     // --- Desenhar a imagem de fundo ---
-    if (texturaFundoMenu != 0)
+    if (texturasDoJogo["backgroundMenu"] != 0)
     {
         glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+        glBindTexture(GL_TEXTURE_2D, texturasDoJogo["backgroundMenu"]);
 
         glColor3f(1.0f, 1.0f, 1.0f);
         glBegin(GL_QUADS);
@@ -309,10 +314,10 @@ void DesenhaTelaFim()
     glLoadIdentity();
 
     // --- Desenhar a imagem de fundo ---
-    if (texturaFundoMenu != 0)
+    if (texturasDoJogo["backgroundMenu"] != 0)
     {
         glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, texturaFundoMenu);
+        glBindTexture(GL_TEXTURE_2D, texturasDoJogo["backgroundMenu"]);
 
         glColor3f(1.0f, 1.0f, 1.0f);
         glBegin(GL_QUADS);
@@ -365,20 +370,118 @@ void DesenhaJogo()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, 800.0, 0.0, 600.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    if (texturasDoJogo["backgroundGame"] != 0)
+    {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, texturasDoJogo["backgroundGame"]);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex2f(0.0f, 0.0f);
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex2f(800.0f, 0.0f);
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex2f(800.0f, 600.0f);
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex2f(0.0f, 600.0f);
+        glEnd();
+        glDisable(GL_TEXTURE_2D);
+    }
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glEnable(GL_DEPTH_TEST);
+
     gluLookAt(16, 4, 1,
               0.0, 0.0, 0.0,
               0.0, 1.0, 0.0);
 
-    // --- Desenhar a Esteira Rolante ---
+    // --- Desenhar a Esteira Rolante (Base) ---
     glPushMatrix();
     glTranslatef(0.0, -0.5, 0.0);
-    desenharCubo(20.0, 1.0, 5.0, 0.5, 0.5, 0.5);
+    desenharCubo(20.0, 1.0, 6.0, 0.6, 0.6, 0.6);
     glPopMatrix();
 
+    // --- Desenhar a Esteira Rolante (Parte Superior com Transparência) - Trecho gerado por IA ---
     glPushMatrix();
     glTranslatef(0.0, 0.0, 0.0);
-    glTranslated(offsetEsteira, 0.0, 0.0);
-    desenharCubo(19.0, 0.2, 4.0, 0.3, 0.3, 0.3);
+    glTranslated(0.0, 0.0, 0.0);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    float beltLength = 19.0f;
+    float beltWidth = 5.0f;
+    float beltHeight = 0.2f;
+    float startX = -beltLength / 2.0f;
+    float endX = beltLength / 2.0f;
+
+    int numSegments = 1000; 
+    float segmentLength = beltLength / numSegments;
+
+    for (int i = 0; i < numSegments; ++i)
+    {
+        float currentSegmentX = startX + i * segmentLength;
+        float nextSegmentX = currentSegmentX + segmentLength;
+        float alpha = 1.0f;
+        if (currentSegmentX < -5.0f)
+        {
+            alpha = (currentSegmentX - LIXO_START_X) / (-5.0f - LIXO_START_X);
+            if (alpha < 0.0f)
+                alpha = 0.0f;
+            if (alpha > 1.0f)
+                alpha = 1.0f;
+        }
+
+        glColor4f(0.3f, 0.3f, 0.3f, alpha);
+
+        glBegin(GL_QUADS);
+        glVertex3f(currentSegmentX, beltHeight / 2.0f, -beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, beltHeight / 2.0f, -beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, beltHeight / 2.0f, beltWidth / 2.0f);
+        glVertex3f(currentSegmentX, beltHeight / 2.0f, beltWidth / 2.0f);
+
+        glColor4f(1.0f, 1.0f, 1.0f, alpha);
+        glVertex3f(currentSegmentX, beltHeight / 2.0f, beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, beltHeight / 2.0f, beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, -beltHeight / 2.0f, beltWidth / 2.0f);
+        glVertex3f(currentSegmentX, -beltHeight / 2.0f, beltWidth / 2.0f);
+
+        glVertex3f(currentSegmentX, -beltHeight / 2.0f, -beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, -beltHeight / 2.0f, -beltWidth / 2.0f);
+        glVertex3f(nextSegmentX, beltHeight / 2.0f, -beltWidth / 2.0f);
+        glVertex3f(currentSegmentX, beltHeight / 2.0f, -beltWidth / 2.0f);
+
+        if (i == 0)
+        {
+            glColor4f(0.2f, 0.2f, 0.2f, alpha);
+            glVertex3f(startX, beltHeight / 2.0f, -beltWidth / 2.0f);
+            glVertex3f(startX, beltHeight / 2.0f, beltWidth / 2.0f);
+            glVertex3f(startX, -beltHeight / 2.0f, beltWidth / 2.0f);
+            glVertex3f(startX, -beltHeight / 2.0f, -beltWidth / 2.0f);
+        }
+
+        if (i == numSegments - 1)
+        {
+            glColor4f(0.2f, 0.2f, 0.2f, alpha);
+            glVertex3f(endX, beltHeight / 2.0f, -beltWidth / 2.0f);
+            glVertex3f(endX, beltHeight / 2.0f, beltWidth / 2.0f);
+            glVertex3f(endX, -beltHeight / 2.0f, beltWidth / 2.0f);
+            glVertex3f(endX, -beltHeight / 2.0f, -beltWidth / 2.0f);
+        }
+        glEnd();
+    }
+
+    glDisable(GL_BLEND);
     glPopMatrix();
 
     // --- Desenhar os Baldes de Lixo ---
@@ -439,15 +542,15 @@ void DesenhaJogo()
 
     std::stringstream ssPontuacao;
     ssPontuacao << "PONTOS: " << pontuacao;
-    desenharTexto(10, 580, ssPontuacao.str().c_str(), 0.0, 1.0, 0.0); // Verde
+    desenharTexto(10, 575, ssPontuacao.str().c_str(), 0.0, 1.0, 0.0); // Verde
 
     std::stringstream ssNivel;
     ssNivel << "NIVEL: " << nivel;
-    desenharTexto(10, 560, ssNivel.str().c_str(), 0.0, 0.0, 1.0); // Azul
+    desenharTexto(10, 555, ssNivel.str().c_str(), 1.0, 1.0, 1.0); // Branco
 
     std::stringstream ssVida;
     ssVida << "VIDAS: " << vida;
-    desenharTexto(10, 540, ssVida.str().c_str(), 1.0, 0.0, 0.0); // Vermelho
+    desenharTexto(10, 535, ssVida.str().c_str(), 1.0, 0.0, 0.0); // Vermelho
 
     // Exibir status de pausa
     if (pause)
@@ -720,7 +823,8 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutCreateWindow("Projeto Final - Cleaning Hero");
-    carregarTexturaMenu("./resources/background.png");
+    carregarTextura("backgroundMenu", "./resources/backgroundMenu.png");
+    carregarTextura("backgroundGame", "./resources/backgroundGame.png");
     glutDisplayFunc(Desenha);
 
     glutKeyboardFunc(Teclado);

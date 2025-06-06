@@ -3,20 +3,23 @@
 Componentes: João Vitor de Carvalho, José Henrique Castro e Victor Cavalcanti
 
 Teclado:
-1          : Escolha (No jogo: Lixo tipo 1, No menu/game over: Escolhe opção)
-2          : Escolha (No jogo: Lixo tipo 2, No menu/game over: Escolhe opção)
-3          : Escolha (No jogo: Lixo tipo 3, No menu/game over: Escolhe opção)
-4          : Escolha (No jogo: Lixo tipo 4, No menu/game over: Escolhe opção)
-5          : Escolha (No jogo: Lixo tipo 5, No menu/game over: Escolhe opção)
+1           : Escolhe lixo tipo 1
+2           : Escolhe lixo tipo 2
+3           : Escolhe lixo tipo 3
+4           : Escolhe lixo tipo 4
+5           : Escolhe lixo tipo 5
+ENTER       : Escolhe opção
+BACKSPACE   : Escolhe opção
+
 
 Teclado Especial:
-HOME        : Encerra partida (no jogo)
-PAGE UP     : Aumenta velocidade da esteira (no jogo)
-PAGE DOWN   : Diminui velocidade da esteira (no jogo)
+HOME        : Encerra partida
+PAGE UP     : Aumenta velocidade da esteira
+PAGE DOWN   : Diminui velocidade da esteira
 
 Mouse:
-LEFT        : Pausar (no jogo)
-RIGHT       : Despausar (no jogo)
+LEFT        : Pausar
+RIGHT       : Despausar
 
 Compilar:
 g++ -o main.exe main.cpp lodepng.cpp -I"./include" -L"./lib/x64" -lfreeglut -lopengl32 -lglu32 -lwinmm
@@ -51,8 +54,9 @@ int nivel = 1;
 int vida = 5;
 const int PONTOS_POR_NIVEL = 100;
 const int PONTOS_POR_ACERTO = 10;
-float velocidadesNivel[] = {0.002f, 0.004f, 0.006f, 0.008f, 0.01f};
+float velocidadesNivel[] = {0.0010f, 0.0012f, 0.0014f, 0.0016f, 0.0018f};
 const int MAX_NIVEL = 5;
+const int MAX_PONTUACAO = 500;
 GLboolean pause = false;
 float velocidadeEsteira = velocidadesNivel[0];
 float offsetEsteira = 0.0f;
@@ -273,15 +277,15 @@ void DesenhaMenuInicial()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Define a função de blending
     glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
     glBegin(GL_QUADS);
-    glVertex2f(340.0f, 270.0f);
-    glVertex2f(350.0f + (12 * 9) + 10.0f, 270.0f);
-    glVertex2f(350.0f + (12 * 9) + 10.0f, 300.0f + 20.0f);
-    glVertex2f(340.0f, 300.0f + 20.0f);
+    glVertex2f(300.0f, 270.0f);
+    glVertex2f(500.0f, 270.0f);
+    glVertex2f(500.0f, 325.0f);
+    glVertex2f(300.0f, 325.0f);
     glEnd();
     glDisable(GL_BLEND); // Desabilita o blending
 
-    desenharTexto(350, 300, "1 - INICIAR", 1.0, 1.0, 1.0);
-    desenharTexto(350, 280, "2 - SAIR", 1.0, 1.0, 1.0);
+    desenharTexto(310, 300, "ENTER - INICIAR", 1.0, 1.0, 1.0);
+    desenharTexto(310, 280, "BACKSPACE - SAIR", 1.0, 1.0, 1.0);
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix(); // Restaura a matriz de projeção 3D
@@ -333,19 +337,19 @@ void DesenhaTelaFim()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Define a função de blending
     glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
     glBegin(GL_QUADS);
-    glVertex2f(290.0f, 220.0f);
-    glVertex2f(530.0f, 220.0f);
-    glVertex2f(530.0f, 328.0f);
-    glVertex2f(290.0f, 328.0f);
+    glVertex2f(270.0f, 220.0f);
+    glVertex2f(540.0f, 220.0f);
+    glVertex2f(540.0f, 328.0f);
+    glVertex2f(270.0f, 328.0f);
     glEnd();
     glDisable(GL_BLEND); // Desabilita o blending
 
     std::stringstream ssPontuacaoFinal;
     ssPontuacaoFinal << "PONTUACAO FINAL: " << pontuacao;
-    desenharTexto(300, 300, ssPontuacaoFinal.str().c_str(), 0.0, 1.0, 0.0);
+    desenharTexto(305, 300, ssPontuacaoFinal.str().c_str(), 0.0, 1.0, 0.0);
 
-    desenharTexto(300, 250, "1 - VOLTAR AO INICIO", 1.0, 1.0, 1.0);
-    desenharTexto(300, 230, "2 - SAIR", 1.0, 1.0, 1.0);
+    desenharTexto(280, 250, "ENTER - VOLTAR AO INICIO", 1.0, 1.0, 1.0);
+    desenharTexto(280, 230, "BACKSPACE - SAIR", 1.0, 1.0, 1.0);
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
@@ -547,7 +551,7 @@ void ResetarJogo()
     lixoSpawnCounter = 0;
     pause = false;
 
-    // Limpa a os lixos na lixeira
+    // Limpa os lixos na lixeira
     lixosNaEsteira.clear();
 
     // Para a música de fundo e a reinicia, garantindo um começo limpo
@@ -563,13 +567,13 @@ void Teclado(unsigned char key, int x, int y)
     switch (estadoAtual)
     {
     case MENU_INICIAL:
-        if (key == '1')
+        if (key == 13)
         {
             estadoAtual = JOGO;
             ResetarJogo();
             Inicializa();
         }
-        else if (key == '2')
+        else if (key == 8)
         {
             PlaySound(NULL, NULL, 0);
             exit(0);
@@ -617,9 +621,9 @@ void Teclado(unsigned char key, int x, int y)
                                 velocidadeEsteira = velocidadesNivel[nivel - 1];
                             }
                         }
-                        if (nivel == MAX_NIVEL && pontuacao >= (nivel * PONTOS_POR_NIVEL + PONTOS_POR_NIVEL))
+                        if (nivel == MAX_NIVEL && pontuacao >= MAX_PONTUACAO)
                         {
-                            estadoAtual = GAME_OVER; // Podemos criar um estado de Vitória no lugar de GAME_OVER nesse caso
+                            estadoAtual = GAME_OVER;
                             Inicializa();
                         }
                         break;
@@ -665,12 +669,13 @@ void Teclado(unsigned char key, int x, int y)
             break;
 
         case GAME_OVER:
-            if (key == '1')
+            if (key == 13)
             {
                 estadoAtual = MENU_INICIAL;
+                srand(time(NULL));
                 Inicializa();
             }
-            else if (key == '2')
+            else if (key == 8)
             {
                 PlaySound(NULL, NULL, 0);
                 exit(0);
@@ -719,7 +724,6 @@ void Mouse(int botao, int estado, int x, int y)
 
 int main(int argc, char **argv)
 {
-    srand(time(NULL));
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);

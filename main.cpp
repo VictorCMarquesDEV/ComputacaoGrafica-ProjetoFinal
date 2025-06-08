@@ -23,6 +23,7 @@ RIGHT       : Despausar
 
 Compilar:
 g++ -o main.exe main.cpp lodepng.cpp -I"./include" -L"./lib/x64" -lfreeglut -lopengl32 -lglu32 -lwinmm
+g++ -o main.exe main.cpp lodepng.cpp -I"./include" -lfreeglut -lopengl32 -lglu32 -lwinmm
 
 Executar:
 .\main.exe
@@ -484,41 +485,60 @@ void DesenhaJogo()
     glDisable(GL_BLEND);
     glPopMatrix();
 
-    // --- Desenhar os Baldes de Lixo ---
-    float espacamentoBaldes = 1.0;
-    float posXInicialBaldes = -2.0;
-    float posYBaldes = -0.9;
-    float posZBaldes = 10.0;
+    // ===== 4. Lixeiras com texturas em 3D =====
+    const float posYBaldes = -0.7f;
+    const float posZBaldes = 10.0f;
+    const float posXInicialBaldes = -2.0f;
+    const float espacamentoBaldes = 1.0f;
+    const float raio = 0.4f;
+    const float altura = 0.8f;
 
-    // Balde para Metal (Amarelo)
-    glPushMatrix();
-    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 1.0, 1.0, 0.0);
-    glPopMatrix();
+    const char* nomesCorpos[] = {
+        "metal", "papel", "plastico", "vidro", "organico"
+    };
+    const char* nomesTampas[] = {
+        "tampa_metal", "tampa_papel", "tampa_plastico", "tampa_vidro", "tampa_organico"
+    };
 
-    // Balde para Papel (Azul)
-    glPushMatrix();
-    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + espacamentoBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.0, 0.0, 1.0);
-    glPopMatrix();
+    for (int i = 0; i < 5; i++) {
+        glPushMatrix();
+        glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + i * espacamentoBaldes);
+        glRotatef(-90.0f, 1.0f, 0.0f, 0.0f); // alinha com eixo Z
 
-    // Balde para Plástico (Vermelho)
-    glPushMatrix();
-    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 2 * espacamentoBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 1.0, 0.0, 0.0);
-    glPopMatrix();
+        GLUquadric* quad = gluNewQuadric();
+        gluQuadricTexture(quad, GL_TRUE);
+        gluQuadricNormals(quad, GLU_SMOOTH);
 
-    // Balde para Vidro (Verde)
-    glPushMatrix();
-    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 3 * espacamentoBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.0, 1.0, 0.0);
-    glPopMatrix();
+        // === Corpo da lixeira ===
+        if (texturasDoJogo[nomesCorpos[i]] != 0) {
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, texturasDoJogo[nomesCorpos[i]]);
+        }
+        glColor3f(1.0f, 1.0f, 1.0f);
+        gluCylinder(quad, raio, raio, altura, 32, 32);
+        glDisable(GL_TEXTURE_2D);
 
-    // Balde para Orgânico (Marrom)
-    glPushMatrix();
-    glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + 4 * espacamentoBaldes);
-    desenharCilindro(0.5, 0.5, 1.0, 32, 32, 0.54, 0.27, 0.07);
-    glPopMatrix();
+        // === Fundo da lixeira ===
+        glPushMatrix();
+            glRotatef(180.0f, 1.0f, 0.0f, 0.0f);
+            gluDisk(quad, 0.0, raio, 32, 1);
+        glPopMatrix();
+
+        // === Tampa da lixeira (topo com textura diferente) ===
+        if (texturasDoJogo[nomesTampas[i]] != 0) {
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, texturasDoJogo[nomesTampas[i]]);
+        }
+        glPushMatrix();
+            glTranslatef(0.0f, 0.0f, altura); // move até o topo
+            glColor3f(1.0f, 1.0f, 1.0f);
+            gluDisk(quad, 0.0, raio, 32, 1);
+        glPopMatrix();
+        glDisable(GL_TEXTURE_2D);
+
+        gluDeleteQuadric(quad);
+        glPopMatrix();
+    }
 
     // --- Desenhar Lixo (Exemplo de um cubo para lixo) ---
     for (const auto &lixo : lixosNaEsteira)
@@ -651,7 +671,7 @@ void ResetarJogo()
 
     // Para a música de fundo e a reinicia, garantindo um começo limpo
     PlaySound(NULL, NULL, 0);
-    PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
+    //PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
 }
 
 // --- Manipulação de Teclado/Mouse ---
@@ -825,12 +845,23 @@ int main(int argc, char **argv)
     glutCreateWindow("Projeto Final - Cleaning Hero");
     carregarTextura("backgroundMenu", "./resources/backgroundMenu.png");
     carregarTextura("backgroundGame", "./resources/backgroundGame.png");
+    carregarTextura("metal", "./resources/lixeiraAmarela.png");
+    carregarTextura("papel", "./resources/lixeiraAzul.png");
+    carregarTextura("plastico", "./resources/lixeiraVermelha.png");
+    carregarTextura("vidro", "./resources/lixeiraVerde.png");
+    carregarTextura("organico", "./resources/lixeiraMarrom.png");
+    carregarTextura("tampa_metal", "./resources/gradient.png");
+    carregarTextura("tampa_papel", "./resources/gradient.png");
+    carregarTextura("tampa_plastico", "./resources/gradient4.png");
+    carregarTextura("tampa_vidro", "./resources/gradient3.png");
+    carregarTextura("tampa_organico", "./resources/gradient2.png");
+
     glutDisplayFunc(Desenha);
 
     glutKeyboardFunc(Teclado);
     glutSpecialFunc(TecladoEspecial);
     glutMouseFunc(Mouse);
-    PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP);
+    //PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP);
 
     glutTimerFunc(0, Anima, 0);
     glutMainLoop();

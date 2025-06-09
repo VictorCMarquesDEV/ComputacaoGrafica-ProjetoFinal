@@ -409,7 +409,7 @@ void DesenhaJogo()
     // --- Desenhar a Esteira Rolante (Base) ---
     glPushMatrix();
     glTranslatef(0.0, -0.5, 0.0);
-    desenharCubo(20.0, 1.0, 6.0, 0.6, 0.6, 0.6);
+    desenharCubo(19.0, 1.0, 6.0, 0.6, 0.6, 0.6);
     glPopMatrix();
 
     // --- Desenhar a Esteira Rolante (Parte Superior com Transparência) - Trecho gerado por IA ---
@@ -426,7 +426,7 @@ void DesenhaJogo()
     float startX = -beltLength / 2.0f;
     float endX = beltLength / 2.0f;
 
-    int numSegments = 1000; 
+    int numSegments = 1000;
     float segmentLength = beltLength / numSegments;
 
     for (int i = 0; i < numSegments; ++i)
@@ -485,32 +485,30 @@ void DesenhaJogo()
     glDisable(GL_BLEND);
     glPopMatrix();
 
-    // ===== 4. Lixeiras com texturas em 3D =====
+    // --- Lixeiras com texturas em 3D ---
     const float posYBaldes = -0.7f;
     const float posZBaldes = 10.0f;
     const float posXInicialBaldes = -2.0f;
     const float espacamentoBaldes = 1.0f;
     const float raio = 0.4f;
     const float altura = 0.8f;
+    const float raioBuraco = 0.35f;
 
-    const char* nomesCorpos[] = {
-        "metal", "papel", "plastico", "vidro", "organico"
-    };
-    const char* nomesTampas[] = {
-        "tampa_metal", "tampa_papel", "tampa_plastico", "tampa_vidro", "tampa_organico"
-    };
+    const char *nomesCorpos[] = {
+        "metal", "papel", "plastico", "vidro", "organico"};
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 5; i++)
+    {
         glPushMatrix();
         glTranslatef(posZBaldes, posYBaldes, posXInicialBaldes + i * espacamentoBaldes);
-        glRotatef(-90.0f, 1.0f, 0.0f, 0.0f); // alinha com eixo Z
+        glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
 
-        GLUquadric* quad = gluNewQuadric();
+        GLUquadric *quad = gluNewQuadric();
         gluQuadricTexture(quad, GL_TRUE);
         gluQuadricNormals(quad, GLU_SMOOTH);
 
-        // === Corpo da lixeira ===
-        if (texturasDoJogo[nomesCorpos[i]] != 0) {
+        if (texturasDoJogo[nomesCorpos[i]] != 0)
+        {
             glEnable(GL_TEXTURE_2D);
             glBindTexture(GL_TEXTURE_2D, texturasDoJogo[nomesCorpos[i]]);
         }
@@ -518,21 +516,15 @@ void DesenhaJogo()
         gluCylinder(quad, raio, raio, altura, 32, 32);
         glDisable(GL_TEXTURE_2D);
 
-        // === Fundo da lixeira ===
         glPushMatrix();
-            glRotatef(180.0f, 1.0f, 0.0f, 0.0f);
-            gluDisk(quad, 0.0, raio, 32, 1);
+        glRotatef(180.0f, 1.0f, 0.0f, 0.0f);
+        gluDisk(quad, 0.0, raio, 32, 1);
         glPopMatrix();
 
-        // === Tampa da lixeira (topo com textura diferente) ===
-        if (texturasDoJogo[nomesTampas[i]] != 0) {
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, texturasDoJogo[nomesTampas[i]]);
-        }
         glPushMatrix();
-            glTranslatef(0.0f, 0.0f, altura); // move até o topo
-            glColor3f(1.0f, 1.0f, 1.0f);
-            gluDisk(quad, 0.0, raio, 32, 1);
+        glTranslatef(0.0f, 0.0f, altura);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        gluDisk(quad, raioBuraco, raio, 32, 1);
         glPopMatrix();
         glDisable(GL_TEXTURE_2D);
 
@@ -671,7 +663,7 @@ void ResetarJogo()
 
     // Para a música de fundo e a reinicia, garantindo um começo limpo
     PlaySound(NULL, NULL, 0);
-    //PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
+    PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
 }
 
 // --- Manipulação de Teclado/Mouse ---
@@ -850,18 +842,13 @@ int main(int argc, char **argv)
     carregarTextura("plastico", "./resources/lixeiraVermelha.png");
     carregarTextura("vidro", "./resources/lixeiraVerde.png");
     carregarTextura("organico", "./resources/lixeiraMarrom.png");
-    carregarTextura("tampa_metal", "./resources/gradient.png");
-    carregarTextura("tampa_papel", "./resources/gradient.png");
-    carregarTextura("tampa_plastico", "./resources/gradient4.png");
-    carregarTextura("tampa_vidro", "./resources/gradient3.png");
-    carregarTextura("tampa_organico", "./resources/gradient2.png");
 
     glutDisplayFunc(Desenha);
 
     glutKeyboardFunc(Teclado);
     glutSpecialFunc(TecladoEspecial);
     glutMouseFunc(Mouse);
-    //PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP);
+    PlaySound(MUSICA_JOGO, NULL, SND_ASYNC | SND_LOOP);
 
     glutTimerFunc(0, Anima, 0);
     glutMainLoop();

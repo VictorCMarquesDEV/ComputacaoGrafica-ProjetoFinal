@@ -40,6 +40,9 @@ Executar:
 #include <mmsystem.h>
 #include <ctime>
 #include <map>
+#include <cmath>
+
+const float PI = 3.1415926535f;
 
 // --- Variáveis de Estado do Jogo ---
 enum GameState
@@ -90,22 +93,45 @@ struct LixoItem
     float posZ; // Posição Z (em qual "trilha" da esteira ele está)
     TipoLixo tipo;
     bool ativo;    // Se ainda está em jogo, não coletado/errado
-    float tamanho; // Para variar visualmente
-    float cor[3];  // Cor específica do lixo(atualmente não utilizado)
+    int seed; // Semente para aleatoriedade na forma
 };
 
 std::vector<LixoItem> lixosNaEsteira;
 
+std::random_device rd;      // Obtém uma semente do hardware (se disponível)
+std::mt19937 gen(rd());     // Semeia o gerador Mersenne Twister
+std::uniform_int_distribution<> distrib(0, NUM_TIPOS_LIXO - 1); // Cria uma distribuição uniforme
+
+// --- Variáveis para controle de repetição ---
+TipoLixo ultimoLixoGerado = METAL;
+int contadorRepeticao = 0;
+
+// --- Variáveis para o efeito de flash de acerto/erro ---
+bool efeitoAuraAtivo = false;
+float corAura[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // Cor da aura (RGBA)
+int duracaoAura = 0;
+const int DURACAO_MAX_AURA = 20;
+int lixeiraAuraIndex = -1;       // Qual lixeira terá a aura (-1 = nenhuma)
+
 // --- Inicialização do OpenGL ---
 void Inicializa()
 {
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glDisable(GL_DEPTH_TEST);
+    glClearColor(0.9f, 0.9f, 0.9f, 1.0f); // Um fundo cinza claro
+    
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glShadeModel(GL_SMOOTH);
+
+    // Configura a câmera
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(45.0, 800.0 / 600.0, 0.1, 100.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+
+    // Semeia o gerador de números aleatórios
+    srand(time(NULL));
 }
 
 // --- Funções para Desenhar Formas Básicas ---
@@ -127,74 +153,250 @@ void desenharCilindro(float raioBase, float raioTop, float altura, int fatias, i
     glPopMatrix();
 }
 
-void desenharFormaLixo(const LixoItem &lixo)
-{
-    float r = 0.5f, g = 0.5f, b = 0.5f; // Cor padrão cinza
-    switch (lixo.tipo)
-    {
-    case METAL:
-        r = 1.0f;
-        g = 1.0f;
-        b = 0.0f;
-        break; // Amarelo
-    case PAPEL:
-        r = 0.0f;
-        g = 0.0f;
-        b = 1.0f;
-        break; // Azul
-    case PLASTICO:
-        r = 1.0f;
-        g = 0.0f;
-        b = 0.0f;
-        break; // Vermelho
-    case VIDRO:
-        r = 0.0f;
-        g = 1.0f;
-        b = 0.0f;
-        break; // Verde
-    case ORGANICO:
-        r = 0.54f;
-        g = 0.27f;
-        b = 0.07f;
-        break; // Marrom
+void desenharLataAmassada() {
+    int segments = 20;
+    float height = 0.5f;
+    float radius = 0.2f;
+
+    glPushMatrix();
+    glScalef(0.8f, 1.0f, 0.8f);
+
+    glBegin(GL_QUAD_STRIP);
+    for (int i = 0; i <= segments; ++i) {
+        float angle = (float)i / segments * 2.0f * PI;
+        float x = cos(angle);
+        float z = sin(angle);
+        float dent_factor_top = 1.0f;
+        float dent_factor_bottom = 0.6f + (cos(angle * 4) * 0.1f);
+
+        // Variação de cor sutil para dar aspecto de sujeira/uso
+        float colorVariation = 0.05f * (sin(angle * 7) + 1.0f);
+        glColor3f(0.75f - colorVariation, 0.75f - colorVariation, 0.8f - colorVariation);
+
+        glVertex3f(x * radius * dent_factor_top, height / 2.0f, z * radius * dent_factor_top);
+        glVertex3f(x * radius * dent_factor_bottom, -height / 2.0f, z * radius * dent_factor_bottom);
     }
-    desenharCubo(0.4f, 0.4f, 0.4f, r, g, b);
+    glEnd();
+
+    // Tampa e Fundo com a cor base
+    glColor3f(0.75f, 0.75f, 0.8f);
+    for (int j = -1; j <= 1; j += 2) {
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex3f(0.0f, (float)j * height / 2.0f, 0.0f);
+        for (int i = 0; i <= segments; ++i) {
+            float angle = (float)i / segments * 2.0f * PI;
+            float dent_factor = (j > 0) ? 1.0f : 0.6f + (cos(angle * 4) * 0.1f);
+            glVertex3f(cos(angle) * radius * dent_factor, (float)j * height / 2.0f, sin(angle) * radius * dent_factor);
+        }
+        glEnd();
+    }
+    glPopMatrix();
 }
 
-void GerarNovoLixo()
-{
-    if (lixosNaEsteira.size() > 15)
-        return;
+void desenharPapelAmassado(int seed) {
+    int segments = 9; // Menos segmentos para um visual mais "quadrado"
+    float radius = 0.35f;
+    srand(seed);
 
-    LixoItem novoLixo;
-    novoLixo.tipo = static_cast<TipoLixo>(rand() % NUM_TIPOS_LIXO);
+    for (int i = 0; i < segments; ++i) {
+        for (int j = 0; j < segments; ++j) {
+            glBegin(GL_POLYGON);
+            // Varia a cor de cada polígono
+             glColor3f(0.9f - (float)(rand()%10)/100.0f, 0.85f - (float)(rand()%10)/100.0f, 0.7f - (float)(rand()%10)/100.0f);
 
-    switch (novoLixo.tipo)
-    {
-    case METAL:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[0]; // Trilha do Metal (-2.0f)
-        break;
-    case PAPEL:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[1]; // Trilha do Papel (-1.0f)
-        break;
-    case PLASTICO:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[2]; // Trilha do Plástico (0.0f)
-        break;
-    case VIDRO:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[3]; // Trilha do Vidro (1.0f)
-        break;
-    case ORGANICO:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[4]; // Trilha do Orgânico (2.0f)
-        break;
-    default:
-        novoLixo.posZ = TRILHA_Z_POSITIONS[0];
-        break;
+            // Vértice 1
+            float phi1 = (float)i / segments * 2.0f * PI;
+            float theta1 = (float)j / segments * PI;
+            float r1 = radius + (float)(rand() % 100) / 700.0f; // Aumenta a irregularidade
+            glVertex3f(r1*cos(phi1)*sin(theta1) * 1.2f, r1*sin(phi1)*sin(theta1) * 0.8f, r1*cos(theta1)); // Deforma a esfera
+
+            // Vértice 2
+            float phi2 = (float)(i + 1) / segments * 2.0f * PI;
+            float r2 = radius + (float)(rand() % 100) / 700.0f;
+            glVertex3f(r2*cos(phi2)*sin(theta1) * 1.2f, r2*sin(phi2)*sin(theta1) * 0.8f, r2*cos(theta1));
+
+            // Vértice 3
+            float theta2 = (float)(j + 1) / segments * PI;
+            float r3 = radius + (float)(rand() % 100) / 700.0f;
+            glVertex3f(r3*cos(phi2)*sin(theta2) * 1.2f, r3*sin(phi2)*sin(theta2) * 0.8f, r3*cos(theta2));
+
+            // Vértice 4
+            float r4 = radius + (float)(rand() % 100) / 700.0f;
+            glVertex3f(r4*cos(phi1)*sin(theta2) * 1.2f, r4*sin(phi1)*sin(theta2) * 0.8f, r4*cos(theta2));
+
+            glEnd();
+        }
     }
+}
 
+void desenharGarrafaPlasticaAmassada() {
+    int segments = 20;
+    float heights[] = {-0.4f, 0.0f, 0.2f, 0.3f, 0.4f};
+    float radii[]   = {0.2f, 0.2f, 0.15f, 0.08f, 0.09f};
+
+    glPushMatrix();
+    glScalef(1.0f, 1.0f, 0.5f); // Amassada no eixo Z
+    glRotatef(20.0f, 1.0f, 0.0f, 0.0f); // Inclinada
+
+    // Habilita a transparência para o plástico
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Define uma cor azul translúcida fixa
+    glColor4f(0.5f, 0.7f, 1.0f, 0.6f);
+
+    for (size_t h = 0; h < 4; ++h) {
+        glBegin(GL_QUAD_STRIP);
+        for (int i = 0; i <= segments; ++i) {
+            float angle = (float)i / segments * 2.0f * PI;
+            float x = cos(angle);
+            float z = sin(angle);
+            
+            glVertex3f(x * radii[h+1], heights[h+1], z * radii[h+1]);
+            glVertex3f(x * radii[h], heights[h], z * radii[h]);
+        }
+        glEnd();
+    }
+    
+    glDisable(GL_BLEND); // Desabilita para não afetar outros objetos
+    glPopMatrix();
+}
+
+void desenharGarrafaDeVidroQuebrada() {
+    int segments = 18;
+    float height = 0.3f;
+    float radius = 0.2f;
+
+    // Habilita o blending para transparência
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Cor verde com 70% de opacidade (alpha = 0.7)
+    glColor4f(0.6f, 0.9f, 0.7f, 0.7f);
+
+    // Base da garrafa
+    glBegin(GL_QUAD_STRIP);
+    for (int i = 0; i <= segments; ++i) {
+        float angle = (float)i / segments * 2.0f * PI;
+        float x = cos(angle);
+        float z = sin(angle);
+        float top_height_modifier = (cos(angle * 5) + 1.0f) * 0.15f + 0.1f;
+        glVertex3f(x * radius, height + top_height_modifier, z * radius);
+        glVertex3f(x * radius, -height, z * radius);
+    }
+    glEnd();
+    
+    // Fundo da garrafa
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(0.0f, -height, 0.0f);
+    for (int i = 0; i <= segments; ++i) {
+        float angle = (float)i / segments * 2.0f * PI;
+        glVertex3f(cos(angle) * radius, -height, sin(angle) * radius);
+    }
+    glEnd();
+
+    // Desabilita para não afetar outros objetos
+    glDisable(GL_BLEND);
+}
+
+void desenharCascaDeBanana() {
+    int segments = 10;
+    glPushMatrix();
+    glScalef(0.6, 0.6, 0.6);
+
+    // 1. Desenha as 3 pétalas da casca
+    for (int p = 0; p < 3; ++p) {
+        glPushMatrix();
+        glRotatef(p * 120.0f, 0.0f, 1.0f, 0.0f); // Gira cada pétala
+        glBegin(GL_QUAD_STRIP);
+        for (int i = 0; i <= segments; ++i) {
+            float t = (float)i / segments;
+            float y = -0.5f * t * t;
+            float z = 1.5f * t;
+            
+            // Gradiente de cor: amarelo para marrom
+            float r = 0.9f - (0.5f * t);
+            float g = 0.8f - (0.6f * t);
+            float b = 0.2f - (0.1f * t);
+
+            glColor3f(r, g, b);
+            glVertex3f(0.1f, y, z);
+            glVertex3f(-0.1f, y, z);
+        }
+        glEnd();
+        glPopMatrix();
+    }
+    
+    // 2. Adiciona a base marrom no CENTRO
+    glPushMatrix();
+    glColor3f(0.3f, 0.15f, 0.05f);
+    glutSolidSphere(0.15f, 8, 8);
+    glPopMatrix();
+
+    glPopMatrix();
+}
+
+// --- Função de desenho do lixo ---
+void desenharFormaLixo(const LixoItem &lixo) {
+    float r, g, b;
+
+    // Define cores que representam melhor cada material
+    switch (lixo.tipo) {
+        case METAL:
+            r = 0.75f; g = 0.75f; b = 0.8f; // Cinza prateado
+            break;
+        case PAPEL:
+            r = 0.9f; g = 0.85f; b = 0.7f; // Bege/Branco sujo
+            break;
+        case PLASTICO:
+            r = 1.0f; g = 0.1f; b = 0.1f;
+            break;
+        case VIDRO:
+            r = 0.6f; g = 0.9f; b = 0.7f; // Verde claro
+            break;
+        case ORGANICO:
+            r = 0.9f; g = 0.8f; b = 0.2f; // Amarelo da banana
+            break;
+        default:
+            r = 0.5f; g = 0.5f; b = 0.5f;
+            break;
+    }
+    glColor3f(r, g, b); // Define a cor base do objeto
+
+    // Desenha a geometria correspondente
+    switch (lixo.tipo) {
+        case METAL:    desenharLataAmassada(); break;
+        case PAPEL:    desenharPapelAmassado(lixo.seed); break;
+        case PLASTICO: desenharGarrafaPlasticaAmassada(); break;
+        case VIDRO:    desenharGarrafaDeVidroQuebrada(); break;
+        case ORGANICO: desenharCascaDeBanana(); break;
+    }
+}
+
+void GerarNovoLixo() {
+    if (lixosNaEsteira.size() > 15) return;
+    LixoItem novoLixo;
+    TipoLixo tipoGerado;
+
+    // Lógica para evitar mais de 4 repetições seguidas
+    do {
+        tipoGerado = static_cast<TipoLixo>(distrib(gen));
+    } while (tipoGerado == ultimoLixoGerado && contadorRepeticao >= 4);
+
+    // Atualiza o contador de repetição
+    if (tipoGerado == ultimoLixoGerado) {
+        contadorRepeticao++;
+    } else {
+        contadorRepeticao = 1;
+    }
+    
+    ultimoLixoGerado = tipoGerado;
+    
+    novoLixo.tipo = tipoGerado;
+    novoLixo.posZ = TRILHA_Z_POSITIONS[novoLixo.tipo];
     novoLixo.posX = LIXO_START_X;
     novoLixo.ativo = true;
-    novoLixo.tamanho = 0.4f;
-
+    novoLixo.seed = distrib(gen);
     lixosNaEsteira.push_back(novoLixo);
 }
 
@@ -402,10 +604,9 @@ void DesenhaJogo()
     glMatrixMode(GL_MODELVIEW);
     glEnable(GL_DEPTH_TEST);
 
-    gluLookAt(16, 4, 1,
-              0.0, 0.0, 0.0,
-              0.0, 1.0, 0.0);
-
+    gluLookAt(18.0, 7.0, 0.0,
+          0.0, 0.0, 0.0,   
+          0.0, 1.0, 0.0);
     // --- Desenhar a Esteira Rolante (Base) ---
     glPushMatrix();
     glTranslatef(0.0, -0.5, 0.0);
@@ -532,6 +733,43 @@ void DesenhaJogo()
         glPopMatrix();
     }
 
+    if (efeitoAuraAtivo && lixeiraAuraIndex != -1)
+    {
+        // Calcula o progresso do efeito (de 0.0 a 1.0)
+        float progresso = 1.0f - ((float)duracaoAura / DURACAO_MAX_AURA);
+        
+        // A aura começa do tamanho da lixeira e expande
+        float raioAura = 0.4f + progresso * 0.4f; 
+        // A aura começa visível e desaparece (fade out)
+        float alphaAura = (1.0f - progresso) * 0.7f;
+
+        // Pega a posição da lixeira que terá o efeito
+        float posX = 10.0f;
+        float posY = -0.7f;
+        float posZ = TRILHA_Z_POSITIONS[lixeiraAuraIndex];
+
+        glPushMatrix();
+        glTranslatef(posX, posY, posZ);
+        glRotatef(-90.0f, 1.0f, 0.0f, 0.0f); // Alinha o cilindro com a lixeira
+
+        // Configurações para desenhar objeto transparente
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE); // Desabilita a escrita no Z-buffer
+
+        glColor4f(corAura[0], corAura[1], corAura[2], alphaAura);
+        
+        GLUquadric* quad = gluNewQuadric();
+        gluCylinder(quad, raioAura, raioAura, 0.8f, 20, 1); // Desenha o cilindro da aura
+        gluDeleteQuadric(quad);
+
+        // Restaura as configurações normais
+        glDepthMask(GL_TRUE); // Reabilita a escrita no Z-buffer
+        glDisable(GL_BLEND);
+        glPopMatrix();
+    }
+
+
     // --- Desenhar Lixo (Exemplo de um cubo para lixo) ---
     for (const auto &lixo : lixosNaEsteira)
     {
@@ -539,7 +777,7 @@ void DesenhaJogo()
         {
             glPushMatrix();
             glTranslatef(lixo.posX, 0.5f, lixo.posZ); // 0.5f é a altura na esteira
-            desenharFormaLixo(lixo);                  // Nova função
+            desenharFormaLixo(lixo);
             glPopMatrix();
         }
     }
@@ -597,6 +835,15 @@ void Desenha()
 // --- Função de Animação (Idle) ---
 void Anima(int valor)
 {
+    // Lógica para controlar a duração do flash
+    if (efeitoAuraAtivo) {
+        duracaoAura--;
+        if (duracaoAura <= 0) {
+            efeitoAuraAtivo = false;
+            lixeiraAuraIndex = -1;
+        }
+    }
+
     if (estadoAtual == JOGO && !pause)
     {
 
@@ -670,24 +917,16 @@ void ResetarJogo()
 void Teclado(unsigned char key, int x, int y)
 {
     bool acertoRealizado = false;
-    TipoLixo tipoSelecionado;
+    bool erroCometido = false;
     switch (estadoAtual)
     {
     case MENU_INICIAL:
-        if (key == 13)
-        {
-            estadoAtual = JOGO;
-            ResetarJogo();
-            Inicializa();
-        }
-        else if (key == 8)
-        {
-            PlaySound(NULL, NULL, 0);
-            exit(0);
-        }
+        if (key == 13) { estadoAtual = JOGO; ResetarJogo(); }
+        else if (key == 8) { PlaySound(NULL, NULL, 0); exit(0); }
         break;
-    case JOGO:
 
+    case JOGO:
+        TipoLixo tipoSelecionado;
         if (key >= '1' && key <= '5')
         {
             switch (key)
@@ -710,86 +949,70 @@ void Teclado(unsigned char key, int x, int y)
             default:
                 return;
             }
+
+            // Procura por um lixo na zona de coleta para interagir
             for (auto &lixo : lixosNaEsteira)
             {
                 if (lixo.ativo && lixo.posX >= ZONA_COLETA_INICIO && lixo.posX <= ZONA_COLETA_FIM)
                 {
                     if (lixo.tipo == tipoSelecionado)
                     {
-                        // ACERTO
+                        // --- ACERTO ---
                         pontuacao += PONTOS_POR_ACERTO;
                         lixo.ativo = false;
                         acertoRealizado = true;
-                        if (nivel < MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL)
-                        {
+
+                        // Ativa a aura VERDE na lixeira CORRETA
+                        efeitoAuraAtivo = true;
+                        duracaoAura = DURACAO_MAX_AURA;
+                        lixeiraAuraIndex = lixo.tipo;
+                        corAura[0] = 0.6f; corAura[1] = 1.0f; corAura[2] = 0.6f;
+
+                        if (nivel < MAX_NIVEL && pontuacao >= nivel * PONTOS_POR_NIVEL) {
                             nivel++;
-                            if (nivel <= MAX_NIVEL)
-                            {
-                                velocidadeEsteira = velocidadesNivel[nivel - 1];
-                            }
+                            velocidadeEsteira = velocidadesNivel[nivel - 1];
                         }
-                        if (nivel == MAX_NIVEL && pontuacao >= MAX_PONTUACAO)
-                        {
-                            estadoAtual = GAME_OVER;
-                            Inicializa();
-                        }
-                        break;
+                        if (pontuacao >= MAX_PONTUACAO) estadoAtual = GAME_OVER;
+                        
+                        break; // Sai do loop pois já processou o acerto
                     }
-                }
-            }
-            if (!acertoRealizado && (key >= '1' && key <= '5'))
-            {
-                bool lixoNaZona = false;
-                bool tipoErradoPressionadoParaLixoPresente = false;
-
-                for (auto &lixo : lixosNaEsteira)
-                {
-                    if (lixo.ativo && lixo.posX >= ZONA_COLETA_INICIO && lixo.posX <= ZONA_COLETA_FIM)
+                    else
                     {
-                        lixoNaZona = true;
-                        if (lixo.tipo != tipoSelecionado)
-                        {
-                            tipoErradoPressionadoParaLixoPresente = true;
-                        }
+                        // --- ERRO (tecla errada para o lixo na zona) ---
+                        erroCometido = true;
                         break;
                     }
                 }
+            }
 
-                if (tipoErradoPressionadoParaLixoPresente)
-                {
-                    vida--;
-                }
-                else if (lixoNaZona)
-                {
-                    // Apertou a tecla certa, mas já foi processado como acerto. Não deveria chegar aqui se acertoRealizado=true
-                }
-                else
-                {
-                    vida--; // Penalidade por apertar "em falso".(A decidir)
-                }
-            }
-            if (vida < 1 && estadoAtual == JOGO)
-            {
-                estadoAtual = GAME_OVER;
-                Inicializa();
-            }
-            break;
+            // Processa o resultado da jogada
+            if (acertoRealizado) {
 
-        case GAME_OVER:
-            if (key == 13)
-            {
-                estadoAtual = MENU_INICIAL;
-                srand(time(NULL));
-                Inicializa();
+            } else if (erroCometido) {
+                vida--;
+                // Ativa a aura VERMELHA na lixeira que o jogador apertou
+                efeitoAuraAtivo = true;
+                duracaoAura = DURACAO_MAX_AURA;
+                lixeiraAuraIndex = tipoSelecionado;
+                corAura[0] = 1.0f; corAura[1] = 0.5f; corAura[2] = 0.5f;
+            } else {
+                // Erro por apertar sem ter lixo na zona
+                vida--;
+                // Ativa a aura VERMELHA na lixeira que o jogador apertou
+                efeitoAuraAtivo = true;
+                duracaoAura = DURACAO_MAX_AURA;
+                lixeiraAuraIndex = tipoSelecionado;
+                corAura[0] = 1.0f; corAura[1] = 0.5f; corAura[2] = 0.5f;
             }
-            else if (key == 8)
-            {
-                PlaySound(NULL, NULL, 0);
-                exit(0);
-            }
-            break;
+
+            if (vida < 1) estadoAtual = GAME_OVER;
         }
-        glutPostRedisplay();
+        break;
+
+    case GAME_OVER:
+        if (key == 13) { estadoAtual = MENU_INICIAL; }
+        else if (key == 8) { PlaySound(NULL, NULL, 0); exit(0); }
+        break;
     }
 }
 
@@ -835,6 +1058,7 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutCreateWindow("Projeto Final - Cleaning Hero");
+    Inicializa();
     carregarTextura("backgroundMenu", "./resources/backgroundMenu.png");
     carregarTextura("backgroundGame", "./resources/backgroundGame.png");
     carregarTextura("metal", "./resources/lixeiraAmarela.png");
